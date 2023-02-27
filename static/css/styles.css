@@ -89,6 +89,7 @@ body {
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 }
 
+
 hr {
   margin: 1rem 0;
   color: inherit;
@@ -11397,8 +11398,8 @@ video.bg-video {
   .masthead .masthead-content h1, .masthead .masthead-content .h1 {
     font-size: 3.5rem;
   }
-  .masthead .masthead-content p {
-    font-size: 1.3rem;
+  .masthead .masthead-content p { /*Tamanho de fonte do site*/
+    font-size: 1.1rem;
   }
 }
 @media (min-width: 1200px) {
