@@ -1,9 +1,13 @@
 # Importando bibliotecas para o python
-from flask import Flask, render_template, send_from_directory, request, send_file, make_response
+from flask import Flask, render_template, send_from_directory, request, send_file, make_response, jsonify, url_for, redirect, session
+import requests
 from reportlab.pdfgen import canvas
 from io import BytesIO
 
 app = Flask(__name__)  # Cria um site vazio
+
+# chave de seguranca requerida para usar session
+app.secret_key = '2kae'
 
 def generate_pdf(name, value, description):
     # Criar PDF com os resultados
@@ -124,20 +128,133 @@ def separar():
     value, description = numerology(name)
     significado = sig(value)
     print(significado)
-    # Exibir os resultados na página web
-    return render_template('resultado.html', name=name, value=value, description=description, significado=significado)
 
+    # Armazena os valores de name e value na sessão do Flask
+    session['name'] = name
+    session['value'] = value
+    session['description'] = description
+    session['significado'] = significado
+
+    # Exibir os resultados na página web
+    return render_template('pagamento.html')
+
+#Link de Download do PDF
+@app.route('/download-pdf/<name>/<value>/<description>')
+def download_pdf(name, value, description):
     # Gerar o PDF com os resultados
     pdf_file = generate_pdf(name, value, description)
 
-    # Enviar o PDF como resposta para download
+    # Configurar a resposta HTTP para fazer o download do PDF
     response = make_response(pdf_file.getvalue())
-    response.headers['Content-Disposition'] = 'attachment; filename=resultados.pdf'
-    response.mimetype = 'application/pdf'
+    response.headers.set('Content-Disposition', 'attachment', filename='resultados.pdf')
+    response.headers.set('Content-Type', 'application/pdf')
 
     return response
 
+#configuracao do pague seguro (producao ou teste)
+def conf():
+    sandbox = True
+    if sandbox:
+        email = "sawabyni@hotmail.com"
+        token = "5C40DB411C9B4757A2867EEBAB3182F3"
+        url = "https://sandbox.api.pagseguro.com/oauth2/application"
 
+    else:
+        email = "sawabyni@hotmail.com"
+        token = "14358cef-3201-4200-80f8-d7bc942aecb7f16ff0c049bd9274da43350bc2bd21e57b66-2eb1-4a16-a78e-7c1ac133b584"
+        url = "https://api.pagseguro.com"
+
+    return url , token
+
+url, token = conf()
+
+# campos a serem enviados
+@app.route('/pagseguro', methods=['POST'])
+def pagseguro():
+
+    name = request.form['name']
+    email = request.form['email']
+    cpf = request.form['cpf']
+    ncard = request.form['ncard']
+    exp_month = request.form['exp_month']
+    exp_year = request.form['exp_year']
+    s_code = request.form['s_code']
+
+    headers = {
+        'Authorization': f"{token} ",
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        "reference_id": "ex-00001",
+        "customer": {
+            "name": f"{name} ",
+            "email": f"{email}",
+            "tax_id": f"{cpf}",
+
+        },
+        "items": [
+            {
+                "reference_id": "referencia do item",
+                "name": "nome do item",
+                "quantity": 1,
+                "unit_amount": 700
+            }
+        ],
+        "shipping": {
+            "address": {
+                "street": "Avenida Brigadeiro Faria Lima",
+                "number": "1384",
+                "complement": "apto 12",
+                "locality": "Pinheiros",
+                "city": "São Paulo",
+                "region_code": "SP",
+                "country": "BRA",
+                "postal_code": "01452002"
+            }
+        },
+        "notification_urls": [
+            "https://meusite.com/notificacoes"
+        ],
+        "charges": [
+            {
+
+                "amount": {
+                    "value": 500,
+                    "currency": "BRL"
+                },
+                "payment_method": {
+                    "type": "CREDIT_CARD",
+                    "installments": 1,
+                    "capture": True,
+                    "card": {
+                      "number": f"{ncard}",
+                      "exp_month": f"{exp_month}",
+                      "exp_year": f"{exp_year}",
+                      "security_code": f"{s_code}",
+                      "holder": {
+                        "name": f"{name} "
+                      },
+                        "store": False
+                    }
+                }
+            }
+        ]
+    }
+    response = requests.post('https://sandbox.api.pagseguro.com/orders', headers=headers, json=payload)
+
+    if response.ok:
+        return redirect(url_for('resultado'))
+
+        # If payment was not successful, return JSON response as before
+    return jsonify(response.json())
+
+@app.route('/resultado')
+def resultado():
+    name = session.get('name', None)
+    value = session.get('value', None)
+    description = session.get('description', None)
+    significado = session.get('significado', None)
+    return render_template('resultado.html', name=name, value=value, description=description, significado=significado)
 
 if __name__ == "__main__":
     app.run(debug=True)  # coloca o site no ar
