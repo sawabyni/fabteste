@@ -9,20 +9,7 @@ app = Flask(__name__)  # Cria um site vazio
 # chave de seguranca requerida para usar session
 app.secret_key = '2kae'
 
-def generate_pdf(name, value, description):
-    # Criar PDF com os resultados
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer)
-    p.drawString(100, 750, "Nome: " + name)
-    p.drawString(100, 700, "Valor: " + str(value))
-    p.drawString(100, 650, "Descrição: " + description)
-    p.showPage()
-    p.save()
 
-    # Salvar PDF em arquivo
-    buffer.seek(0)
-
-    return buffer
 @app.route('/')
 def home():
     return render_template('home.html')
@@ -127,22 +114,63 @@ def separar():
     name = request.form['palavra']
     value, description = numerology(name)
     significado = sig(value)
-    print(significado)
 
     # Armazena os valores de name e value na sessão do Flask
     session['name'] = name
     session['value'] = value
-    session['description'] = description
     session['significado'] = significado
 
     # Exibir os resultados na página web
     return render_template('pagamento.html')
 
+# Geracao de PDF
+def generate_pdf(name, value, significado):
+    # Criar PDF com os resultados
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer)
+    imagem = "static/logteste.jpg"
+    logo = "static/logo.gif"
+    p.drawImage(imagem, x=0, y=0, width=900, height= 900)
+    p.drawImage(logo, x=30, y=730, width=80, height=80)
+    p.drawString(100, 650, "Empresa: " + name)
+    p.drawString(100, 600, "Numerologia: " + str(value))
+    p.drawString(100, 550, "Significado:")
+    # Definir posição inicial para a primeira linha do significado
+    x, y = 100, 520
+
+    # Quebrar o texto do significado em várias linhas com base na largura do canvas
+    significado_lines = []
+    line = ''
+    for word in significado.split():
+        if p.stringWidth(line + word) < 400:
+            line += word + ' '
+        else:
+            significado_lines.append(line)
+            line = word + ' '
+    significado_lines.append(line)
+
+    # Iterar sobre as linhas do significado
+    for line in significado_lines:
+        # Se a linha exceder a altura da página, adicionar uma nova página
+        if y < 50:
+            p.showPage()
+            y = 750
+
+        # Adicionar a linha à página atual
+        p.drawString(x, y, line)
+        y -= 20
+    p.showPage()
+    p.save()
+
+    # Salvar PDF em arquivo
+    buffer.seek(0)
+
+    return buffer
 #Link de Download do PDF
-@app.route('/download-pdf/<name>/<value>/<description>')
-def download_pdf(name, value, description):
+@app.route('/download-pdf/<name>/<value>/<significado>')
+def download_pdf(name, value, significado):
     # Gerar o PDF com os resultados
-    pdf_file = generate_pdf(name, value, description)
+    pdf_file = generate_pdf(name, value, significado)
 
     # Configurar a resposta HTTP para fazer o download do PDF
     response = make_response(pdf_file.getvalue())
@@ -245,16 +273,15 @@ def pagseguro():
     if response.ok:
         return redirect(url_for('resultado'))
 
-        # If payment was not successful, return JSON response as before
+        # se co pagamento nao foi precessado com sucesso, retorna JSON response
     return jsonify(response.json())
 
 @app.route('/resultado')
 def resultado():
     name = session.get('name', None)
     value = session.get('value', None)
-    description = session.get('description', None)
     significado = session.get('significado', None)
-    return render_template('resultado.html', name=name, value=value, description=description, significado=significado)
+    return render_template('resultado.html', name=name, value=value, significado=significado)
 
 if __name__ == "__main__":
     app.run(debug=True)  # coloca o site no ar
