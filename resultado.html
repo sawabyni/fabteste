@@ -31,7 +31,7 @@
                     <p class="mb-5">O nome escolhido para sua empresa, {{ name }} , corresponde ao numero {{ value }} na numerologia</p>
                     <h2 class="fst-italic lh-1 mb-4"> O significado da numerologia</h2>
                     <p class="sig">{{ significado }}</p>
-                    <a href="{{ url_for('download_pdf', name=name, value=value, description=description) }}">Download dos resultados em PDF</a><br>
+                    <a href="{{ url_for('download_pdf', name=name, value=value, significado=significado) }}">Download dos resultados em PDF</a><br>
                     <a href="/">Calcular outro nome</a>
                     <!-- * * * * * * * * * * * * * * *-->
                     <!-- * * SB Forms Contact Form * *-->
